@@ -5,6 +5,7 @@ requests
 httpx
 pandas
 openpyxl
+python-multipart
 passlib[bcrypt]
 python-jose[cryptography]
 python-dotenv
