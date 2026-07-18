@@ -3,6 +3,8 @@ uvicorn
 pydantic
 requests
 httpx
+pandas
+openpyxl
 passlib[bcrypt]
 python-jose[cryptography]
 python-dotenv
