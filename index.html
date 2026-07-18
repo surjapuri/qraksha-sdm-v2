@@ -1,0 +1,1367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QRaksha SDM v2 — Identity Intelligence Platform</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.7.7/axios.min.js"></script>
+  <style>
+    /* ═══ DESIGN TOKENS ════════════════════════════════════════════════════ */
+    :root {
+      --bg:           #080d16;
+      --bg-2:         #0b1120;
+      --surface:      #0f1929;
+      --surface-2:    #162035;
+      --surface-3:    #1c2a45;
+      --border:       #1e3050;
+      --border-2:     #243858;
+      --accent:       #3b82f6;
+      --accent-dim:   #1d4ed8;
+      --accent-glow:  rgba(59,130,246,0.18);
+      --accent-2:     #6366f1;
+      --safe:         #10b981;
+      --safe-bg:      rgba(16,185,129,0.08);
+      --safe-border:  rgba(16,185,129,0.3);
+      --warn:         #f59e0b;
+      --warn-bg:      rgba(245,158,11,0.08);
+      --warn-border:  rgba(245,158,11,0.3);
+      --danger:       #ef4444;
+      --danger-bg:    rgba(239,68,68,0.08);
+      --danger-border:rgba(239,68,68,0.3);
+      --purple:       #8b5cf6;
+      --purple-bg:    rgba(139,92,246,0.08);
+      --purple-border:rgba(139,92,246,0.3);
+      --cyan:         #06b6d4;
+      --cyan-bg:      rgba(6,182,212,0.08);
+      --text:         #dde4f0;
+      --text-2:       #94a3b8;
+      --text-3:       #4a6080;
+      --mono:         'JetBrains Mono','Fira Code','Courier New',monospace;
+      --sans:         'Inter',system-ui,-apple-system,sans-serif;
+      --r:            8px;
+      --r-lg:         14px;
+      --r-xl:         18px;
+      --shadow:       0 8px 32px rgba(0,0,0,0.5);
+      --shadow-lg:    0 16px 48px rgba(0,0,0,0.6);
+    }
+
+    /* ═══ RESET ═════════════════════════════════════════════════════════════ */
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html{font-size:14.5px;scroll-behavior:smooth}
+    body{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.6;min-height:100vh}
+    a{color:var(--accent);text-decoration:none}
+    a:hover{text-decoration:underline}
+    img{display:block;max-width:100%}
+
+    /* ═══ SCROLLBAR ══════════════════════════════════════════════════════════ */
+    ::-webkit-scrollbar{width:6px;height:6px}
+    ::-webkit-scrollbar-track{background:var(--bg)}
+    ::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:3px}
+
+    /* ═══ HEADER ════════════════════════════════════════════════════════════ */
+    header {
+      position: sticky; top: 0; z-index: 200;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 1.5rem; height: 56px;
+      backdrop-filter: blur(12px);
+    }
+    .logo { display:flex; align-items:center; gap:10px; }
+    .logo-icon {
+      width:34px;height:34px;border-radius:9px;
+      background:linear-gradient(135deg,var(--accent),var(--accent-2));
+      display:flex;align-items:center;justify-content:center;font-size:17px;
+      box-shadow:0 0 14px rgba(99,102,241,0.4);
+    }
+    .logo-text { font-weight:800; font-size:1rem; letter-spacing:-0.01em; }
+    .logo-sub  { font-size:0.65rem; color:var(--text-3); text-transform:uppercase; letter-spacing:0.1em; }
+    .header-right { display:flex; align-items:center; gap:12px; }
+    .status-pill {
+      display:flex;align-items:center;gap:6px;
+      background:var(--surface-2);border:1px solid var(--border);
+      border-radius:20px;padding:4px 10px;font-size:0.72rem;color:var(--text-2);
+      font-family:var(--mono);
+    }
+    .dot {
+      width:7px;height:7px;border-radius:50%;
+      background:var(--safe);box-shadow:0 0 6px var(--safe);
+      animation:blink 2s ease-in-out infinite;
+    }
+    .dot.offline { background:var(--danger); box-shadow:0 0 6px var(--danger); }
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+    .auth-pill {
+      display:flex;align-items:center;gap:8px;font-size:0.78rem;
+    }
+    .auth-label { color:var(--text-2); font-family:var(--mono); }
+    .auth-name  { color:var(--safe);   font-weight:700; }
+
+    /* ═══ NAV ═══════════════════════════════════════════════════════════════ */
+    nav {
+      background:var(--surface);border-bottom:1px solid var(--border);
+      display:flex;gap:0;overflow-x:auto;padding:0 1rem;
+    }
+    nav::-webkit-scrollbar{height:0}
+    .tab {
+      padding:.65rem 1.1rem;font-size:.82rem;font-weight:600;
+      color:var(--text-3);cursor:pointer;white-space:nowrap;
+      border-bottom:2px solid transparent;transition:color .2s,border-color .2s;
+      user-select:none;display:flex;align-items:center;gap:5px;
+    }
+    .tab:hover { color:var(--text-2); }
+    .tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+    .tab .lock { font-size:.65rem; opacity:.5; }
+
+    /* ═══ MAIN / SECTIONS ════════════════════════════════════════════════════ */
+    main { max-width:1180px; margin:0 auto; padding:1.75rem 1.25rem 5rem; }
+    .section { display:none; }
+    .section.active { display:block; }
+    .section-head { margin-bottom:1.5rem; }
+    .section-title { font-size:1.25rem; font-weight:800; letter-spacing:-.02em; }
+    .section-desc  { font-size:.82rem; color:var(--text-2); margin-top:3px; }
+
+    /* ═══ CARDS ══════════════════════════════════════════════════════════════ */
+    .card {
+      background:var(--surface);border:1px solid var(--border);
+      border-radius:var(--r-lg);padding:1.4rem;box-shadow:var(--shadow);
+    }
+    .card + .card { margin-top:1rem; }
+    .card-title {
+      font-size:.85rem;font-weight:700;margin-bottom:1rem;
+      color:var(--text-2);text-transform:uppercase;letter-spacing:.07em;
+      display:flex;align-items:center;gap:7px;
+    }
+
+    /* ═══ FORM ═══════════════════════════════════════════════════════════════ */
+    .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:.85rem; }
+    .form-full { grid-column:1/-1; }
+    @media(max-width:680px){ .form-grid{grid-template-columns:1fr} }
+    .fg { display:flex; flex-direction:column; gap:4px; }
+    label {
+      font-size:.72rem;font-weight:700;color:var(--text-3);
+      text-transform:uppercase;letter-spacing:.07em;
+    }
+    label .req { color:var(--danger); margin-left:2px; }
+    label .hint { font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-3);margin-left:5px; }
+    input[type=text],input[type=url],input[type=password],select,textarea {
+      background:var(--bg-2);border:1px solid var(--border);border-radius:var(--r);
+      color:var(--text);font-family:var(--sans);font-size:.88rem;
+      padding:.5rem .8rem;outline:none;width:100%;
+      transition:border-color .2s,box-shadow .2s;
+    }
+    input:focus,select:focus,textarea:focus {
+      border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow);
+    }
+    input::placeholder,textarea::placeholder { color:var(--text-3); }
+    select option { background:var(--surface-2); }
+    textarea { resize:vertical;min-height:84px;font-family:var(--mono);font-size:.8rem; }
+
+    /* ═══ BUTTONS ════════════════════════════════════════════════════════════ */
+    .btn {
+      border:none;border-radius:var(--r);cursor:pointer;
+      font-family:var(--sans);font-size:.84rem;font-weight:700;
+      padding:.55rem 1.15rem;
+      transition:opacity .2s,transform .1s,box-shadow .2s;
+      display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
+    }
+    .btn:active { transform:scale(.97); }
+    .btn:disabled { opacity:.38;cursor:not-allowed; }
+    .btn-primary { background:var(--accent);color:#fff; }
+    .btn-primary:hover:not(:disabled) { background:var(--accent-dim);box-shadow:0 0 14px var(--accent-glow); }
+    .btn-success { background:var(--safe);color:#fff; }
+    .btn-success:hover:not(:disabled) { opacity:.85; }
+    .btn-danger  { background:var(--danger);color:#fff; }
+    .btn-danger:hover:not(:disabled)  { opacity:.85; }
+    .btn-ghost   { background:transparent;border:1px solid var(--border);color:var(--text-2); }
+    .btn-ghost:hover:not(:disabled)   { border-color:var(--accent);color:var(--text); }
+    .btn-purple  { background:var(--purple);color:#fff; }
+    .btn-purple:hover:not(:disabled)  { opacity:.85; }
+    .btn-cyan    { background:var(--cyan);color:#000; }
+    .btn-cyan:hover:not(:disabled)    { opacity:.85; }
+    .btn-sm { padding:.32rem .7rem; font-size:.76rem; }
+    .btn-lg { padding:.75rem 1.6rem; font-size:.95rem; }
+    .btn-row { display:flex;gap:8px;flex-wrap:wrap;align-items:center; }
+    .btn-row.right { justify-content:flex-end; }
+
+    /* ═══ SCANNER ════════════════════════════════════════════════════════════ */
+    .scan-bar { display:flex;gap:8px;margin-bottom:1.25rem; }
+    .scan-bar input { flex:1;font-size:.95rem;padding:.7rem 1rem; }
+    .examples { display:flex;flex-wrap:wrap;gap:6px;margin-bottom:1.25rem; }
+    .ex-chip {
+      font-family:var(--mono);font-size:.72rem;
+      background:var(--surface-2);border:1px solid var(--border);
+      border-radius:6px;padding:3px 9px;cursor:pointer;color:var(--accent);
+      transition:border-color .15s;
+    }
+    .ex-chip:hover { border-color:var(--accent); }
+    .risk-block {
+      border-radius:var(--r-lg);padding:1.4rem;
+      border-left:4px solid transparent;display:none;
+      animation:fadeUp .3s ease;
+    }
+    @keyframes fadeUp{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+    .risk-block.safe   { background:var(--safe-bg);   border-color:var(--safe);   display:block; }
+    .risk-block.warn   { background:var(--warn-bg);   border-color:var(--warn);   display:block; }
+    .risk-block.danger { background:var(--danger-bg); border-color:var(--danger); display:block; }
+    .risk-header { display:flex;align-items:flex-start;gap:14px;margin-bottom:1rem; }
+    .risk-score-wrap { text-align:center;min-width:64px; }
+    .risk-score { font-size:2.8rem;font-weight:900;font-family:var(--mono);line-height:1; }
+    .risk-score.safe   { color:var(--safe);   text-shadow:0 0 20px rgba(16,185,129,.4); }
+    .risk-score.warn   { color:var(--warn);   text-shadow:0 0 20px rgba(245,158,11,.4); }
+    .risk-score.danger { color:var(--danger); text-shadow:0 0 20px rgba(239,68,68,.4); }
+    .risk-score-sub  { font-size:.64rem;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;margin-top:2px; }
+    .risk-info { flex:1; }
+    .risk-level { font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.12em;margin-bottom:3px; }
+    .risk-entity { font-size:.95rem;font-weight:700;margin-bottom:4px; }
+    .risk-spoof-type { font-size:.72rem;font-family:var(--mono);color:var(--text-2); }
+    .risk-msgs { display:grid;grid-template-columns:1fr 1fr;gap:.85rem; }
+    @media(max-width:600px){ .risk-msgs{grid-template-columns:1fr} }
+    .risk-msg { background:rgba(0,0,0,.25);border-radius:var(--r);padding:.8rem 1rem; }
+    .risk-msg-lang { font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:5px; }
+    .risk-msg-text { font-size:.84rem;line-height:1.55; }
+
+    /* ═══ BULK UPLOAD DROPZONE ════════════════════════════════════════════════ */
+    .dropzone {
+      border:2px dashed var(--border-2);border-radius:var(--r-lg);
+      padding:2.5rem 1.5rem;text-align:center;cursor:pointer;
+      transition:border-color .2s,background .2s;position:relative;
+    }
+    .dropzone:hover,.dropzone.over {
+      border-color:var(--accent);background:var(--accent-glow);
+    }
+    .dropzone input[type=file] {
+      position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;
+    }
+    .dropzone-icon { font-size:2.4rem;margin-bottom:.6rem; }
+    .dropzone-label { font-size:.88rem;color:var(--text-2);margin-bottom:.3rem; }
+    .dropzone-sub   { font-size:.74rem;color:var(--text-3); }
+    .bulk-result {
+      margin-top:1rem;display:none;border-radius:var(--r);padding:.85rem 1rem;
+      font-size:.84rem;
+    }
+    .bulk-result.ok  { background:var(--safe-bg);   border:1px solid var(--safe-border);   color:var(--safe); display:block; }
+    .bulk-result.err { background:var(--danger-bg); border:1px solid var(--danger-border); color:var(--danger); display:block; }
+
+    /* ═══ WIKIDATA + AI PARSER: PREVIEW FORM ═════════════════════════════════ */
+    .preview-panel {
+      margin-top:1.1rem;display:none;
+      border:1px solid var(--border-2);border-radius:var(--r-lg);
+      background:var(--surface-2);padding:1.2rem;
+      animation:fadeUp .3s ease;
+    }
+    .preview-panel.active { display:block; }
+    .preview-badge {
+      display:inline-flex;align-items:center;gap:5px;font-size:.7rem;font-weight:700;
+      text-transform:uppercase;letter-spacing:.08em;
+      padding:3px 9px;border-radius:12px;margin-bottom:.85rem;
+    }
+    .badge-wd  { background:var(--cyan-bg);  color:var(--cyan);  border:1px solid rgba(6,182,212,.3); }
+    .badge-ai  { background:var(--purple-bg);color:var(--purple);border:1px solid var(--purple-border); }
+    .badge-ok  { background:var(--safe-bg);  color:var(--safe);  border:1px solid var(--safe-border); }
+    .badge-warn{ background:var(--warn-bg);  color:var(--warn);  border:1px solid var(--warn-border); }
+
+    /* ═══ STATS ROW ══════════════════════════════════════════════════════════ */
+    .stats { display:grid;grid-template-columns:repeat(4,1fr);gap:.85rem;margin-bottom:1.25rem; }
+    @media(max-width:700px){ .stats{grid-template-columns:repeat(2,1fr)} }
+    .stat {
+      background:var(--surface);border:1px solid var(--border);
+      border-radius:var(--r);padding:.9rem 1rem;text-align:center;
+    }
+    .stat-n { font-size:1.9rem;font-weight:900;font-family:var(--mono);line-height:1.1; }
+    .stat-l { font-size:.67rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-top:3px; }
+
+    /* ═══ FILTER BAR ══════════════════════════════════════════════════════════ */
+    .filters { display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1.1rem; }
+    .filter {
+      padding:.3rem .85rem;border:1px solid var(--border);border-radius:20px;
+      background:transparent;color:var(--text-2);font-size:.75rem;font-weight:700;cursor:pointer;
+      transition:all .18s;
+    }
+    .filter:hover,.filter.on { background:var(--accent);border-color:var(--accent);color:#fff; }
+
+    /* ═══ IDENTITY CARDS ══════════════════════════════════════════════════════ */
+    .id-grid {
+      display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:.85rem;
+    }
+    .id-card {
+      background:var(--surface);border:1px solid var(--border);
+      border-radius:var(--r-lg);padding:1.15rem;
+      transition:border-color .2s;
+    }
+    .id-card:hover { border-color:var(--border-2); }
+    .id-card-head {
+      display:flex;align-items:flex-start;justify-content:space-between;gap:8px;
+      margin-bottom:.7rem;
+    }
+    .id-name   { font-weight:800;font-size:.92rem;line-height:1.3; }
+    .id-name-hi{ font-size:.78rem;color:var(--text-2);margin-top:1px; }
+    .badge {
+      flex-shrink:0;font-size:.62rem;font-weight:800;padding:2px 8px;border-radius:10px;
+      text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;border:1px solid;
+    }
+    .badge-verified { background:var(--safe-bg);   color:var(--safe);   border-color:rgba(16,185,129,.35); }
+    .badge-pending  { background:var(--purple-bg); color:var(--purple); border-color:var(--purple-border); }
+    .badge-rejected { background:var(--danger-bg); color:var(--danger); border-color:var(--danger-border); }
+    .id-tags { display:flex;flex-wrap:wrap;gap:5px;margin-bottom:.7rem; }
+    .tag {
+      font-size:.67rem;padding:2px 7px;border-radius:5px;
+      background:var(--surface-3);color:var(--text-2);border:1px solid var(--border);
+    }
+    .id-handles { font-size:.77rem;color:var(--text-2);font-family:var(--mono);margin-bottom:.7rem;display:flex;flex-direction:column;gap:3px; }
+    .id-handle-row { display:flex;align-items:center;gap:6px; }
+    .id-handle-lbl { color:var(--text-3);font-size:.68rem;width:18px; }
+    .conf-wrap { margin-bottom:.75rem; }
+    .conf-hd { display:flex;justify-content:space-between;font-size:.68rem;color:var(--text-3);margin-bottom:4px; }
+    .conf-bar { height:4px;background:var(--border);border-radius:2px;overflow:hidden; }
+    .conf-fill {
+      height:100%;border-radius:2px;
+      background:linear-gradient(90deg,var(--accent),var(--safe));
+      transition:width .5s ease;
+    }
+    .src-tags { display:flex;gap:4px;flex-wrap:wrap;margin-bottom:.75rem; }
+    .src-tag  {
+      font-size:.63rem;padding:1px 6px;border-radius:4px;font-family:var(--mono);
+      background:var(--surface-3);color:var(--cyan);border:1px solid rgba(6,182,212,.2);
+    }
+    .id-actions { display:flex;gap:6px;flex-wrap:wrap; }
+
+    /* ═══ LOGIN MODAL ════════════════════════════════════════════════════════ */
+    .modal-overlay {
+      position:fixed;inset:0;background:rgba(8,13,22,.85);
+      z-index:500;display:none;align-items:center;justify-content:center;
+      backdrop-filter:blur(8px);
+    }
+    .modal-overlay.open { display:flex; }
+    .modal {
+      background:var(--surface);border:1px solid var(--border-2);
+      border-radius:var(--r-xl);padding:2rem;width:360px;max-width:94vw;
+      box-shadow:var(--shadow-lg);animation:fadeUp .3s ease;
+    }
+    .modal-head { text-align:center;margin-bottom:1.5rem; }
+    .modal-icon { font-size:2.2rem;margin-bottom:.5rem; }
+    .modal-title{ font-size:1.1rem;font-weight:800;margin-bottom:4px; }
+    .modal-sub  { font-size:.78rem;color:var(--text-2); }
+    .modal-fields { display:flex;flex-direction:column;gap:.75rem;margin-bottom:1.25rem; }
+    .modal-err {
+      font-size:.8rem;padding:.6rem .85rem;border-radius:var(--r);
+      background:var(--danger-bg);border:1px solid var(--danger-border);
+      color:var(--danger);display:none;margin-bottom:.75rem;
+    }
+    .modal-err.show { display:block; }
+    .modal-footer { text-align:center;margin-top:.75rem; }
+    .modal-footer p { font-size:.74rem;color:var(--text-3); }
+
+    /* ═══ AUTH GUARD ══════════════════════════════════════════════════════════ */
+    .auth-guard {
+      text-align:center;padding:3rem 1rem;
+      border:2px dashed var(--border);border-radius:var(--r-xl);
+      display:none;
+    }
+    .auth-guard.show { display:block; }
+    .auth-guard-icon { font-size:2rem;margin-bottom:.6rem; }
+    .auth-guard p { font-size:.88rem;color:var(--text-2);margin-bottom:1rem; }
+
+    /* ═══ EMPTY STATE ════════════════════════════════════════════════════════ */
+    .empty { text-align:center;padding:2.5rem 1rem;color:var(--text-3); }
+    .empty-icon { font-size:2rem;margin-bottom:.5rem; }
+    .empty p { font-size:.84rem; }
+
+    /* ═══ ALERT BANNER ════════════════════════════════════════════════════════ */
+    .alert {
+      border-radius:var(--r);padding:.7rem 1rem;font-size:.83rem;
+      display:none;margin-bottom:.85rem;
+    }
+    .alert.ok  { background:var(--safe-bg);   border:1px solid var(--safe-border);   color:var(--safe);   display:block; }
+    .alert.err { background:var(--danger-bg); border:1px solid var(--danger-border); color:var(--danger); display:block; }
+    .alert.inf { background:var(--cyan-bg);   border:1px solid rgba(6,182,212,.3);   color:var(--cyan);   display:block; }
+
+    /* ═══ DIVIDER ════════════════════════════════════════════════════════════ */
+    hr { border:none;border-top:1px solid var(--border);margin:1.1rem 0; }
+
+    /* ═══ TOAST ══════════════════════════════════════════════════════════════ */
+    #toast-root { position:fixed;bottom:1.25rem;right:1.25rem;z-index:9999;display:flex;flex-direction:column;gap:7px; }
+    .toast {
+      background:var(--surface-2);border:1px solid var(--border-2);
+      border-radius:var(--r);padding:.65rem 1rem;font-size:.82rem;
+      max-width:320px;box-shadow:var(--shadow);animation:slideIn .25s ease;
+    }
+    @keyframes slideIn{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:translateX(0)}}
+    .toast.ok  { border-left:3px solid var(--safe); }
+    .toast.err { border-left:3px solid var(--danger); }
+    .toast.inf { border-left:3px solid var(--accent); }
+
+    /* ═══ SPINNER OVERLAY ════════════════════════════════════════════════════ */
+    #spinner { position:fixed;inset:0;background:rgba(8,13,22,.6);z-index:400;display:none;align-items:center;justify-content:center; }
+    #spinner.on { display:flex; }
+    .spin { width:32px;height:32px;border:3px solid var(--border-2);border-top-color:var(--accent);border-radius:50%;animation:rot .65s linear infinite; }
+    @keyframes rot{to{transform:rotate(360deg)}}
+
+    /* ═══ MISC ════════════════════════════════════════════════════════════════ */
+    .mt1 { margin-top:.5rem; }
+    .mt2 { margin-top:1rem; }
+    .dimtext { color:var(--text-2); font-size:.8rem; }
+    code {
+      font-family:var(--mono);font-size:.78rem;
+      background:var(--surface-3);padding:2px 6px;border-radius:4px;color:var(--accent);
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══ HEADER ══════════════════════════════════════════════════════════════ -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🛡️</div>
+    <div>
+      <div class="logo-text">QRaksha <span style="color:var(--accent)">SDM</span> <span style="color:var(--text-3);font-size:.65rem;font-weight:500">v2</span></div>
+      <div class="logo-sub">Identity Intelligence Platform</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill">
+      <div class="dot" id="api-dot"></div>
+      <span id="api-label">Connecting…</span>
+    </div>
+    <div class="auth-pill" id="auth-pill">
+      <span class="auth-label" id="auth-status-label">Not logged in</span>
+      <button class="btn btn-primary btn-sm" id="login-btn" onclick="openLoginModal()">🔑 Admin Login</button>
+    </div>
+  </div>
+</header>
+
+<!-- ═══ NAV TABS ════════════════════════════════════════════════════════════ -->
+<nav>
+  <div class="tab active" data-tab="scanner">🔍 Scanner</div>
+  <div class="tab" data-tab="ingest">➕ Submit Entry</div>
+  <div class="tab" data-tab="bulk">📁 Bulk Upload <span class="lock">🔒</span></div>
+  <div class="tab" data-tab="wikidata">🌐 Wikidata OSINT</div>
+  <div class="tab" data-tab="aiparser">🤖 AI Parser</div>
+  <div class="tab" data-tab="admin">🛡️ Admin Portal <span class="lock">🔒</span></div>
+</nav>
+
+<!-- ═══ MAIN ═════════════════════════════════════════════════════════════════ -->
+<main>
+
+  <!-- ══ SCANNER ═══════════════════════════════════════════════════════════ -->
+  <section id="tab-scanner" class="section active">
+    <div class="section-head">
+      <div class="section-title">Real-Time Impersonation Scanner</div>
+      <div class="section-desc">Enter any handle, URL, or name to scan against the verified identity registry — किसी भी हैंडल, URL या नाम को सत्यापित रजिस्ट्री से जाँचें।</div>
+    </div>
+    <div class="card">
+      <div class="scan-bar">
+        <input type="text" id="scan-input" placeholder="@PMOIndia  |  narendramodi.in  |  PM0India" autocomplete="off" spellcheck="false" />
+        <button class="btn btn-primary btn-lg" id="scan-btn" onclick="runScan()">⚡ Scan</button>
+      </div>
+      <div style="margin-bottom:.9rem;">
+        <span class="dimtext" style="margin-right:6px;">Try:</span>
+        <div class="examples" style="display:inline-flex;margin:0;">
+          <span class="ex-chip" onclick="setScan('PMOIndia')">PMOIndia</span>
+          <span class="ex-chip" onclick="setScan('PM0India')">PM0India</span>
+          <span class="ex-chip" onclick="setScan('narendramodi')">narendramodi</span>
+          <span class="ex-chip" onclick="setScan('narendra_m0di')">narendra_m0di</span>
+          <span class="ex-chip" onclick="setScan('rbi.org.in')">rbi.org.in</span>
+          <span class="ex-chip" onclick="setScan('R8l_official')">R8l_official</span>
+          <span class="ex-chip" onclick="setScan('unknown_xyz99')">unknown_xyz99</span>
+        </div>
+      </div>
+      <div id="risk-block" class="risk-block">
+        <div class="risk-header">
+          <div class="risk-score-wrap">
+            <div class="risk-score" id="risk-score">—</div>
+            <div class="risk-score-sub">Risk Score</div>
+          </div>
+          <div class="risk-info">
+            <div class="risk-level" id="risk-level">—</div>
+            <div class="risk-entity" id="risk-entity">—</div>
+            <div class="risk-spoof-type" id="risk-spoof"></div>
+          </div>
+          <span class="badge" id="risk-badge">—</span>
+        </div>
+        <div class="risk-msgs">
+          <div class="risk-msg">
+            <div class="risk-msg-lang">🇬🇧 English</div>
+            <div class="risk-msg-text" id="risk-en">—</div>
+          </div>
+          <div class="risk-msg">
+            <div class="risk-msg-lang">🇮🇳 हिंदी</div>
+            <div class="risk-msg-text" id="risk-hi">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card mt2">
+      <div class="card-title">⚙️ Detection Engine Layers</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.85rem;">
+        <div><div style="color:var(--safe);font-weight:700;margin-bottom:3px;">✅ Score 0 — Safe</div><div class="dimtext">Exact match in verified registry. Profile is authentic.</div></div>
+        <div><div style="color:var(--warn);font-weight:700;margin-bottom:3px;">⚠️ Score 40 — Unknown</div><div class="dimtext">No match found. Unverified — exercise caution.</div></div>
+        <div><div style="color:var(--danger);font-weight:700;margin-bottom:3px;">🚨 Score 85 — High Risk</div><div class="dimtext">Lookalike, digit swap, typo, or substring spoof detected.</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ SUBMIT ENTRY (MANUAL) ══════════════════════════════════════════════ -->
+  <section id="tab-ingest" class="section">
+    <div class="section-head">
+      <div class="section-title">Manual Submission Engine</div>
+      <div class="section-desc">Stage a new identity for admin review. All submissions enter as <strong>Pending</strong> with trust score 0.</div>
+    </div>
+    <div class="card">
+      <div id="ingest-alert" class="alert"></div>
+      <div class="form-grid">
+        <div class="fg"><label>ID Slug <span class="req">*</span><span class="hint">e.g. pmo-india</span></label><input type="text" id="fi-id" placeholder="pmo-india"/></div>
+        <div class="fg"><label>Official Name <span class="req">*</span></label><input type="text" id="fi-name" placeholder="Prime Minister's Office, India"/></div>
+        <div class="fg"><label>Hindi Name <span class="hint">optional</span></label><input type="text" id="fi-namehi" placeholder="प्रधानमंत्री कार्यालय"/></div>
+        <div class="fg"><label>Entity Type <span class="req">*</span></label>
+          <select id="fi-type"><option value="">— Select —</option><option>Individual</option><option>Institution</option></select></div>
+        <div class="fg"><label>Category <span class="req">*</span></label>
+          <select id="fi-cat"><option value="">— Select —</option><option>Government</option><option>Celebrity</option><option>Brand</option><option>Media</option><option>Finance</option><option>Education</option><option>NGO</option><option>Other</option></select></div>
+        <div class="fg"><label>Official Website</label><input type="url" id="fi-web" placeholder="https://www.example.gov.in"/></div>
+        <div class="fg"><label>X (Twitter) Handle<span class="hint">without @</span></label><input type="text" id="fi-x" placeholder="PMOIndia"/></div>
+        <div class="fg"><label>Instagram Handle<span class="hint">without @</span></label><input type="text" id="fi-ig" placeholder="pmoindia"/></div>
+        <div class="fg form-full"><label>Source URLs<span class="hint">one per line</span></label><textarea id="fi-src" placeholder="https://pmindia.gov.in&#10;https://twitter.com/PMOIndia"></textarea></div>
+      </div>
+      <hr/>
+      <div class="btn-row right">
+        <button class="btn btn-ghost" onclick="clearIngestForm()">Clear</button>
+        <button class="btn btn-primary" id="ingest-btn" onclick="submitManual()">➕ Submit for Review</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ BULK UPLOAD ════════════════════════════════════════════════════════ -->
+  <section id="tab-bulk" class="section">
+    <div class="section-head">
+      <div class="section-title">Bulk Ingest Engine</div>
+      <div class="section-desc">Upload a CSV, Excel (.xlsx), or JSON file to batch-stage multiple records. Requires admin session.</div>
+    </div>
+
+    <div class="auth-guard" id="bulk-guard">
+      <div class="auth-guard-icon">🔒</div>
+      <p>Admin authentication required to upload bulk data.</p>
+      <button class="btn btn-primary" onclick="openLoginModal()">🔑 Login as Admin</button>
+    </div>
+
+    <div id="bulk-panel" style="display:none;">
+      <div class="card">
+        <div class="card-title">📁 File Drop Zone</div>
+        <div class="dropzone" id="dropzone" onclick="document.getElementById('bulk-file').click()">
+          <input type="file" id="bulk-file" accept=".csv,.xlsx,.xls,.json" onchange="handleFileSelect(this)"/>
+          <div class="dropzone-icon">📂</div>
+          <div class="dropzone-label">Drag & drop your file here, or click to browse</div>
+          <div class="dropzone-sub">Accepted: .csv · .xlsx · .xls · .json</div>
+          <div class="dropzone-sub mt1" id="file-selected-name" style="color:var(--accent);"></div>
+        </div>
+        <div class="bulk-result" id="bulk-result"></div>
+        <hr/>
+        <div class="btn-row right">
+          <button class="btn btn-ghost" id="bulk-clear-btn" onclick="clearBulkFile()">Clear</button>
+          <button class="btn btn-primary" id="bulk-upload-btn" onclick="uploadBulk()" disabled>⬆️ Upload &amp; Stage</button>
+        </div>
+      </div>
+      <div class="card mt2">
+        <div class="card-title">📋 Expected Column Names (Flexible)</div>
+        <div class="dimtext" style="line-height:2;">
+          <code>id</code> or <code>slug</code> &nbsp;·&nbsp; <code>official_name</code> or <code>name</code> &nbsp;·&nbsp;
+          <code>official_name_hi</code> or <code>hindi_name</code> &nbsp;·&nbsp; <code>entity_type</code> or <code>type</code> &nbsp;·&nbsp;
+          <code>category</code> &nbsp;·&nbsp; <code>official_website</code> or <code>website</code> &nbsp;·&nbsp;
+          <code>official_x_handle</code> or <code>twitter</code> &nbsp;·&nbsp; <code>official_instagram_handle</code> or <code>instagram</code> &nbsp;·&nbsp;
+          <code>source_urls</code> or <code>sources</code> (pipe or comma-separated)
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ WIKIDATA OSINT ════════════════════════════════════════════════════ -->
+  <section id="tab-wikidata" class="section">
+    <div class="section-head">
+      <div class="section-title">Wikidata OSINT Connector</div>
+      <div class="section-desc">Search Wikidata by entity name — automatically pulls official website, X handle, and Instagram from the knowledge graph.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">🔭 Entity Search</div>
+      <div class="scan-bar">
+        <input type="text" id="wd-input" placeholder="e.g. Reserve Bank of India, Narendra Modi, ISRO…" />
+        <button class="btn btn-cyan" id="wd-btn" onclick="fetchWikidata()">🌐 Search Wikidata</button>
+      </div>
+      <div id="wd-alert" class="alert"></div>
+
+      <!-- Preview panel -->
+      <div class="preview-panel" id="wd-preview">
+        <span class="preview-badge badge-wd">🌐 Wikidata Result</span>
+        <div class="form-grid" id="wd-preview-grid">
+          <div class="fg"><label>ID Slug</label><input type="text" id="wd-id"/></div>
+          <div class="fg"><label>Official Name</label><input type="text" id="wd-name"/></div>
+          <div class="fg"><label>Hindi Name</label><input type="text" id="wd-namehi" placeholder="Fill manually if known"/></div>
+          <div class="fg"><label>Entity Type</label>
+            <select id="wd-type"><option>Institution</option><option>Individual</option></select></div>
+          <div class="fg"><label>Category</label>
+            <select id="wd-cat"><option>Government</option><option>Celebrity</option><option>Brand</option><option>Media</option><option>Finance</option><option>Education</option><option>NGO</option><option>Other</option></select></div>
+          <div class="fg"><label>Official Website</label><input type="url" id="wd-web"/></div>
+          <div class="fg"><label>X Handle</label><input type="text" id="wd-x"/></div>
+          <div class="fg"><label>Instagram Handle</label><input type="text" id="wd-ig"/></div>
+          <div class="fg form-full"><label>Source URLs</label><textarea id="wd-src"></textarea></div>
+        </div>
+        <hr/>
+        <div class="btn-row right">
+          <button class="btn btn-ghost" onclick="document.getElementById('wd-preview').classList.remove('active')">Dismiss</button>
+          <button class="btn btn-primary" onclick="stagePreview('wd','Wikidata')">➕ Stage this Entry</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ AI PARSER ══════════════════════════════════════════════════════════ -->
+  <section id="tab-aiparser" class="section">
+    <div class="section-head">
+      <div class="section-title">AI Unstructured Document Parser</div>
+      <div class="section-desc">Paste raw text — official notifications, social posts, news excerpts. Claude AI extracts structured identity fields automatically. Falls back to regex if API key is absent.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">🤖 Text Input</div>
+      <div class="fg form-full">
+        <label>Raw Text Paste <span class="req">*</span><span class="hint">max ~4500 characters processed</span></label>
+        <textarea id="ai-text" style="min-height:150px;" placeholder="Paste any unstructured text here…&#10;&#10;Example: The official Instagram account of the Reserve Bank of India is @rbi.official and their website is https://www.rbi.org.in. Follow them on Twitter at @RBI for monetary policy updates."></textarea>
+      </div>
+      <div class="fg mt1">
+        <label>Hint <span class="hint">optional — e.g. 'This is about a government banking institution in India'</span></label>
+        <input type="text" id="ai-hint" placeholder="Optional context hint…"/>
+      </div>
+      <div id="ai-alert" class="alert mt1"></div>
+      <hr/>
+      <div class="btn-row right">
+        <button class="btn btn-ghost" onclick="document.getElementById('ai-text').value='';document.getElementById('ai-hint').value='';">Clear</button>
+        <button class="btn btn-purple" id="ai-btn" onclick="runAIParser()">🤖 Parse with AI</button>
+      </div>
+
+      <!-- Preview panel -->
+      <div class="preview-panel" id="ai-preview">
+        <span class="preview-badge badge-ai">🤖 AI Extracted Fields</span>
+        <div id="ai-parser-note" class="alert" style="margin-bottom:.85rem;"></div>
+        <div class="form-grid">
+          <div class="fg"><label>ID Slug</label><input type="text" id="ai-id"/></div>
+          <div class="fg"><label>Official Name</label><input type="text" id="ai-name"/></div>
+          <div class="fg"><label>Hindi Name</label><input type="text" id="ai-namehi"/></div>
+          <div class="fg"><label>Entity Type</label>
+            <select id="ai-type"><option>Institution</option><option>Individual</option></select></div>
+          <div class="fg"><label>Category</label>
+            <select id="ai-cat"><option>Government</option><option>Celebrity</option><option>Brand</option><option>Media</option><option>Finance</option><option>Education</option><option>NGO</option><option>Other</option></select></div>
+          <div class="fg"><label>Official Website</label><input type="url" id="ai-web"/></div>
+          <div class="fg"><label>X Handle</label><input type="text" id="ai-x"/></div>
+          <div class="fg"><label>Instagram Handle</label><input type="text" id="ai-ig"/></div>
+          <div class="fg form-full"><label>Source URLs</label><textarea id="ai-src"></textarea></div>
+        </div>
+        <hr/>
+        <div class="btn-row right">
+          <button class="btn btn-ghost" onclick="document.getElementById('ai-preview').classList.remove('active')">Dismiss</button>
+          <button class="btn btn-primary" onclick="stagePreview('ai','AI_Parser')">➕ Stage this Entry</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ ADMIN PORTAL ═══════════════════════════════════════════════════════ -->
+  <section id="tab-admin" class="section">
+    <div class="section-head" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:.75rem;">
+      <div>
+        <div class="section-title">Admin Portal</div>
+        <div class="section-desc">Review, approve, and manage all identity records. JWT-protected.</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="loadAdmin()">⟳ Refresh</button>
+    </div>
+
+    <div class="auth-guard" id="admin-guard">
+      <div class="auth-guard-icon">🔒</div>
+      <p>You must be logged in as Admin to access the management portal.</p>
+      <button class="btn btn-primary" onclick="openLoginModal()">🔑 Login as Admin</button>
+    </div>
+
+    <div id="admin-panel" style="display:none;">
+      <div class="stats" id="stats-row">
+        <div class="stat"><div class="stat-n" id="s-total" style="color:var(--accent)">—</div><div class="stat-l">Total Records</div></div>
+        <div class="stat"><div class="stat-n" id="s-verified" style="color:var(--safe)">—</div><div class="stat-l">Verified</div></div>
+        <div class="stat"><div class="stat-n" id="s-pending" style="color:var(--purple)">—</div><div class="stat-l">Pending Review</div></div>
+        <div class="stat"><div class="stat-n" id="s-rejected" style="color:var(--danger)">—</div><div class="stat-l">Rejected</div></div>
+      </div>
+      <div class="filters">
+        <button class="filter on"  onclick="setFilter('all',this)">All</button>
+        <button class="filter" onclick="setFilter('Pending',this)">🟣 Pending</button>
+        <button class="filter" onclick="setFilter('Verified',this)">🟢 Verified</button>
+        <button class="filter" onclick="setFilter('Rejected',this)">🔴 Rejected</button>
+      </div>
+      <div class="id-grid" id="id-grid">
+        <div class="empty" style="grid-column:1/-1"><div class="empty-icon">⏳</div><p>Loading records…</p></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ═══ LOGIN MODAL ══════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="login-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-icon">🔐</div>
+      <div class="modal-title">Admin Authentication</div>
+      <div class="modal-sub">JWT credentials stored in session memory only</div>
+    </div>
+    <div class="modal-err" id="login-err"></div>
+    <div class="modal-fields">
+      <div class="fg"><label>Username</label><input type="text" id="login-user" placeholder="admin" autocomplete="username"/></div>
+      <div class="fg"><label>Password</label><input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password"/></div>
+    </div>
+    <button class="btn btn-primary w-full" id="login-submit-btn" onclick="doLogin()" style="width:100%;">🔑 Authenticate</button>
+    <div class="modal-footer">
+      <p>Default dev credentials: <code>admin</code> / <code>admin</code><br/>Set <code>ADMIN_PASSWORD_HASH</code> env var in production.</p>
+      <button class="btn btn-ghost btn-sm mt1" onclick="closeLoginModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TOAST ROOT ════════════════════════════════════════════════════════════ -->
+<div id="toast-root"></div>
+
+<!-- ═══ SPINNER OVERLAY ════════════════════════════════════════════════════ -->
+<div id="spinner"><div class="spin"></div></div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     JAVASCRIPT
+     ═══════════════════════════════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+// ── CONFIG ────────────────────────────────────────────────────────────────────
+const API_BASE = window.QRAKSHA_API || 'https://qraksha-sdm-api.onrender.com';
+
+// ── AUTH STATE (in-memory only — never persisted to localStorage) ─────────────
+let _token    = null;
+let _username = null;
+let _allRecords = [];
+let _activeFilter = 'all';
+let _bulkFile = null;
+
+// ── AXIOS INTERCEPTORS ────────────────────────────────────────────────────────
+axios.interceptors.request.use(cfg => {
+  if (_token) cfg.headers['Authorization'] = `Bearer ${_token}`;
+  return cfg;
+});
+
+axios.interceptors.response.use(
+  res => res,
+  err => {
+    if (err.response?.status === 401 && _token) {
+      _token = null; _username = null;
+      updateAuthUI(false);
+      showLoginModal('Your session has expired. Please log in again.');
+    }
+    return Promise.reject(err);
+  }
+);
+
+// ── BOOT ──────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  initTabs();
+  ping();
+  updateAuthUI(false);
+
+  // Enter key shortcuts
+  document.getElementById('scan-input').addEventListener('keydown', e => { if(e.key==='Enter') runScan(); });
+  document.getElementById('wd-input').addEventListener('keydown',   e => { if(e.key==='Enter') fetchWikidata(); });
+  document.getElementById('login-pass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+
+  // Drag-and-drop on dropzone
+  const dz = document.getElementById('dropzone');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('over');
+    const f = e.dataTransfer.files[0];
+    if (f) setBulkFile(f);
+  });
+});
+
+// ── TAB NAVIGATION ────────────────────────────────────────────────────────────
+function initTabs() {
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      tab.classList.add('active');
+      const sec = document.getElementById(`tab-${tab.dataset.tab}`);
+      if (sec) sec.classList.add('active');
+
+      // Lazy-load protected sections
+      if (tab.dataset.tab === 'admin') { renderAdminGuard(); if(_token) loadAdmin(); }
+      if (tab.dataset.tab === 'bulk')  renderBulkGuard();
+    });
+  });
+}
+
+// ── API PING ──────────────────────────────────────────────────────────────────
+async function ping() {
+  try {
+    const { data } = await axios.get(`${API_BASE}/`, { timeout: 6000 });
+    const dot = document.getElementById('api-dot');
+    const lbl = document.getElementById('api-label');
+    dot.classList.remove('offline');
+    lbl.textContent = `API ● ${data.storage === 'github' ? 'GitHub DB' : 'Local DB'} ● AI:${data.ai_parser}`;
+    lbl.style.color = 'var(--safe)';
+  } catch {
+    document.getElementById('api-dot').classList.add('offline');
+    document.getElementById('api-label').textContent = 'API ● Offline';
+    document.getElementById('api-label').style.color = 'var(--danger)';
+  }
+}
+
+// ── AUTH ──────────────────────────────────────────────────────────────────────
+function openLoginModal(msg) {
+  document.getElementById('login-modal').classList.add('open');
+  const err = document.getElementById('login-err');
+  if (msg) { err.textContent = msg; err.classList.add('show'); }
+  else      { err.classList.remove('show'); }
+  setTimeout(() => document.getElementById('login-user').focus(), 80);
+}
+
+function closeLoginModal() {
+  document.getElementById('login-modal').classList.remove('open');
+  document.getElementById('login-err').classList.remove('show');
+  document.getElementById('login-pass').value = '';
+}
+
+async function doLogin() {
+  const user = document.getElementById('login-user').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  if (!user || !pass) {
+    showLoginError('Username and password are required.');
+    return;
+  }
+  const btn = document.getElementById('login-submit-btn');
+  btn.disabled = true; btn.textContent = 'Authenticating…';
+
+  try {
+    const params = new URLSearchParams({ username: user, password: pass });
+    const { data } = await axios.post(`${API_BASE}/api/auth/token`, params, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    _token    = data.access_token;
+    _username = user;
+    closeLoginModal();
+    updateAuthUI(true);
+    toast(`Logged in as ${user}`, 'ok');
+
+    // Auto-load admin data if on admin tab
+    const activeTab = document.querySelector('.tab.active')?.dataset?.tab;
+    if (activeTab === 'admin') loadAdmin();
+    if (activeTab === 'bulk')  renderBulkGuard();
+  } catch (err) {
+    const msg = err.response?.data?.detail || 'Authentication failed. Check credentials.';
+    showLoginError(msg);
+  } finally {
+    btn.disabled = false; btn.textContent = '🔑 Authenticate';
+  }
+}
+
+function showLoginError(msg) {
+  const el = document.getElementById('login-err');
+  el.textContent = msg; el.classList.add('show');
+}
+
+function logout() {
+  _token = null; _username = null;
+  updateAuthUI(false);
+  renderAdminGuard();
+  renderBulkGuard();
+  toast('Logged out.', 'inf');
+}
+
+function updateAuthUI(loggedIn) {
+  const pill  = document.getElementById('auth-pill');
+  const label = document.getElementById('auth-status-label');
+  if (loggedIn) {
+    label.innerHTML = `<span class="auth-name">⚑ ${esc(_username)}</span>`;
+    const logoutBtn = document.getElementById('login-btn');
+    logoutBtn.textContent = 'Logout';
+    logoutBtn.onclick = logout;
+    logoutBtn.className = 'btn btn-ghost btn-sm';
+  } else {
+    label.innerHTML = '<span class="auth-label">Not logged in</span>';
+    const lb = document.getElementById('login-btn');
+    lb.textContent = '🔑 Admin Login';
+    lb.onclick = openLoginModal;
+    lb.className = 'btn btn-primary btn-sm';
+  }
+}
+
+function renderAdminGuard() {
+  const guard = document.getElementById('admin-guard');
+  const panel = document.getElementById('admin-panel');
+  if (_token) {
+    guard.classList.remove('show'); panel.style.display = 'block';
+  } else {
+    guard.classList.add('show');    panel.style.display = 'none';
+  }
+}
+
+function renderBulkGuard() {
+  const guard = document.getElementById('bulk-guard');
+  const panel = document.getElementById('bulk-panel');
+  if (_token) {
+    guard.classList.remove('show'); panel.style.display = 'block';
+  } else {
+    guard.classList.add('show');    panel.style.display = 'none';
+  }
+}
+
+// ── SCANNER ───────────────────────────────────────────────────────────────────
+function setScan(val) {
+  document.getElementById('scan-input').value = val;
+  runScan();
+}
+
+async function runScan() {
+  const q = document.getElementById('scan-input').value.trim();
+  if (!q) { toast('Enter a handle or URL to scan.', 'inf'); return; }
+
+  const btn   = document.getElementById('scan-btn');
+  const block = document.getElementById('risk-block');
+  btn.disabled = true; btn.textContent = 'Scanning…';
+  block.className = 'risk-block';
+
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/check`, { params: { query: q } });
+    renderRisk(data, q);
+  } catch (err) {
+    toast('Scan failed — is the API running?', 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = '⚡ Scan';
+  }
+}
+
+function renderRisk(d, query) {
+  const block = document.getElementById('risk-block');
+  const score = d.risk_score;
+
+  let cls, sCls, bCls, bTxt;
+  if      (score === 0)  { cls='safe';   sCls='safe';   bCls='badge-verified'; bTxt='✅ SAFE'; }
+  else if (score >= 70)  { cls='danger'; sCls='danger'; bCls='badge-rejected'; bTxt='🚨 HIGH RISK'; }
+  else                   { cls='warn';   sCls='warn';   bCls='badge-pending';  bTxt='⚠️ UNVERIFIED'; }
+
+  block.className = `risk-block ${cls}`;
+  const sc = document.getElementById('risk-score');
+  sc.className = `risk-score ${sCls}`; sc.textContent = score;
+  document.getElementById('risk-level').textContent  = d.risk_level.replace('_',' ');
+  document.getElementById('risk-entity').textContent = d.matched_entity ? `Matched: ${d.matched_entity}` : `Query: "${query}"`;
+  document.getElementById('risk-spoof').textContent  = d.spoof_type ? `Detection type: ${d.spoof_type.replace('_',' ')}` : '';
+  const badge = document.getElementById('risk-badge');
+  badge.className = `badge ${bCls}`; badge.textContent = bTxt;
+  document.getElementById('risk-en').textContent = d.message_en || '—';
+  document.getElementById('risk-hi').textContent = d.message_hi  || '—';
+}
+
+// ── MANUAL INGEST ─────────────────────────────────────────────────────────────
+function getIngestData() {
+  const sources = (document.getElementById('fi-src').value || '')
+    .split('\n').map(s=>s.trim()).filter(Boolean);
+  return {
+    id:                        document.getElementById('fi-id').value.trim(),
+    official_name:             document.getElementById('fi-name').value.trim(),
+    official_name_hi:          document.getElementById('fi-namehi').value.trim() || null,
+    entity_type:               document.getElementById('fi-type').value,
+    category:                  document.getElementById('fi-cat').value,
+    official_website:          document.getElementById('fi-web').value.trim() || null,
+    official_x_handle:         document.getElementById('fi-x').value.trim() || null,
+    official_instagram_handle: document.getElementById('fi-ig').value.trim() || null,
+    verified_status:           'Pending',
+    confidence_score:          0,
+    source_urls:               sources,
+    discovered_sources:        ['Manual'],
+  };
+}
+
+function validateIngest(d) {
+  if (!d.id)           return 'ID Slug is required.';
+  if (!/^[a-z0-9\-]+$/.test(d.id)) return 'ID must be lowercase letters, numbers, and hyphens only.';
+  if (!d.official_name) return 'Official Name is required.';
+  if (!d.entity_type)   return 'Entity Type is required.';
+  if (!d.category)      return 'Category is required.';
+  return null;
+}
+
+function setIngestAlert(msg, type) {
+  const el = document.getElementById('ingest-alert');
+  if (!msg) { el.className = 'alert'; el.textContent = ''; return; }
+  el.className = `alert ${type}`;
+  el.textContent = msg;
+}
+
+async function submitManual() {
+  const data = getIngestData();
+  const err  = validateIngest(data);
+  if (err) { setIngestAlert(err, 'err'); return; }
+  setIngestAlert('', '');
+
+  const btn = document.getElementById('ingest-btn');
+  btn.disabled = true; btn.textContent = 'Submitting…';
+
+  try {
+    await axios.post(`${API_BASE}/api/identities`, data);
+    setIngestAlert(`✅ '${data.official_name}' staged successfully. Pending admin review.`, 'ok');
+    clearIngestForm();
+    toast(`Staged: ${data.official_name}`, 'ok');
+  } catch (err) {
+    const msg = err.response?.data?.detail || 'Submission failed.';
+    setIngestAlert(`❌ ${msg}`, 'err');
+    toast(msg, 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = '➕ Submit for Review';
+  }
+}
+
+function clearIngestForm() {
+  ['fi-id','fi-name','fi-namehi','fi-web','fi-x','fi-ig','fi-src'].forEach(id =>
+    { document.getElementById(id).value = ''; });
+  document.getElementById('fi-type').value = '';
+  document.getElementById('fi-cat').value  = '';
+  setIngestAlert('', '');
+}
+
+// ── BULK UPLOAD ───────────────────────────────────────────────────────────────
+function handleFileSelect(input) {
+  if (input.files[0]) setBulkFile(input.files[0]);
+}
+
+function setBulkFile(file) {
+  _bulkFile = file;
+  document.getElementById('file-selected-name').textContent = `Selected: ${file.name}`;
+  document.getElementById('bulk-upload-btn').disabled = false;
+  document.getElementById('bulk-result').className = 'bulk-result';
+  document.getElementById('bulk-result').textContent = '';
+}
+
+function clearBulkFile() {
+  _bulkFile = null;
+  document.getElementById('bulk-file').value = '';
+  document.getElementById('file-selected-name').textContent = '';
+  document.getElementById('bulk-upload-btn').disabled = true;
+  document.getElementById('bulk-result').className = 'bulk-result';
+}
+
+async function uploadBulk() {
+  if (!_bulkFile) { toast('No file selected.', 'inf'); return; }
+  if (!_token)    { openLoginModal('Login required to upload.'); return; }
+
+  const btn = document.getElementById('bulk-upload-btn');
+  btn.disabled = true; btn.textContent = 'Uploading…';
+  spin(true);
+
+  const form = new FormData();
+  form.append('file', _bulkFile);
+
+  try {
+    const { data } = await axios.post(`${API_BASE}/api/identities/bulk`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    const el = document.getElementById('bulk-result');
+    el.className = 'bulk-result ok';
+    el.innerHTML = `✅ <strong>Upload complete:</strong> ${data.inserted} inserted, ${data.skipped} skipped.<br/>
+      IDs staged: ${data.inserted_ids.slice(0,8).map(id=>`<code>${esc(id)}</code>`).join(', ')}${data.inserted_ids.length>8?'…':''}`;
+    toast(`Bulk: ${data.inserted} staged, ${data.skipped} skipped.`, 'ok');
+  } catch (err) {
+    const msg = err.response?.data?.detail || 'Bulk upload failed.';
+    const el = document.getElementById('bulk-result');
+    el.className = 'bulk-result err'; el.textContent = `❌ ${msg}`;
+    toast(msg, 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = '⬆️ Upload & Stage';
+    spin(false);
+  }
+}
+
+// ── WIKIDATA CONNECTOR ────────────────────────────────────────────────────────
+function setWdAlert(msg, type) {
+  const el = document.getElementById('wd-alert');
+  if (!msg) { el.className = 'alert'; el.textContent = ''; return; }
+  el.className = `alert ${type}`; el.textContent = msg;
+}
+
+async function fetchWikidata() {
+  const q = document.getElementById('wd-input').value.trim();
+  if (!q) { toast('Enter an entity name to search.', 'inf'); return; }
+
+  const btn = document.getElementById('wd-btn');
+  btn.disabled = true; btn.textContent = 'Searching…';
+  document.getElementById('wd-preview').classList.remove('active');
+  setWdAlert('', '');
+  spin(true);
+
+  try {
+    const { data } = await axios.post(`${API_BASE}/api/identities/fetch-wikidata`, { query: q });
+    if (!data.found) {
+      setWdAlert(`No Wikidata entity found for "${q}". Try a more specific name.`, 'inf');
+    } else {
+      fillPreview('wd', data);
+      document.getElementById('wd-preview').classList.add('active');
+      setWdAlert(`Found: ${data.official_name} (${data.wikidata_id}) — review fields below.`, 'ok');
+    }
+  } catch (err) {
+    setWdAlert(err.response?.data?.detail || 'Wikidata search failed.', 'err');
+    toast('Wikidata error.', 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = '🌐 Search Wikidata';
+    spin(false);
+  }
+}
+
+// ── AI PARSER ─────────────────────────────────────────────────────────────────
+function setAiAlert(msg, type) {
+  const el = document.getElementById('ai-alert');
+  if (!msg) { el.className = 'alert'; el.textContent = ''; return; }
+  el.className = `alert ${type}`; el.textContent = msg;
+}
+
+async function runAIParser() {
+  const text = document.getElementById('ai-text').value.trim();
+  const hint = document.getElementById('ai-hint').value.trim();
+  if (!text || text.length < 10) { toast('Text is too short to parse.', 'inf'); return; }
+
+  const btn = document.getElementById('ai-btn');
+  btn.disabled = true; btn.textContent = 'Parsing…';
+  document.getElementById('ai-preview').classList.remove('active');
+  setAiAlert('', '');
+  spin(true);
+
+  try {
+    const { data } = await axios.post(`${API_BASE}/api/identities/parse-unstructured`, {
+      text, hint: hint || null,
+    });
+
+    fillPreview('ai', data);
+    document.getElementById('ai-preview').classList.add('active');
+
+    const noteEl = document.getElementById('ai-parser-note');
+    if (data._parser_note) {
+      noteEl.className = 'alert warn';
+      noteEl.textContent = `⚠️ ${data._parser_note}`;
+    } else {
+      noteEl.className = 'alert';
+    }
+    setAiAlert('Fields extracted — review and edit before staging.', 'ok');
+  } catch (err) {
+    setAiAlert(err.response?.data?.detail || 'Parsing failed.', 'err');
+    toast('Parser error.', 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = '🤖 Parse with AI';
+    spin(false);
+  }
+}
+
+// ── PREVIEW PANEL HELPERS ─────────────────────────────────────────────────────
+function fillPreview(prefix, data) {
+  const set = (suffix, val) => {
+    const el = document.getElementById(`${prefix}-${suffix}`);
+    if (!el) return;
+    el.value = val || '';
+  };
+  set('id',     data.id);
+  set('name',   data.official_name);
+  set('namehi', data.official_name_hi);
+  set('web',    data.official_website);
+  set('x',      data.official_x_handle);
+  set('ig',     data.official_instagram_handle);
+  set('src',    (data.source_urls || []).join('\n'));
+
+  // Set selects
+  const typeEl = document.getElementById(`${prefix}-type`);
+  const catEl  = document.getElementById(`${prefix}-cat`);
+  if (typeEl && data.entity_type) typeEl.value = data.entity_type;
+  if (catEl  && data.category)    catEl.value  = data.category;
+}
+
+async function stagePreview(prefix, sourceTag) {
+  const get = suffix => {
+    const el = document.getElementById(`${prefix}-${suffix}`);
+    return el ? el.value.trim() : '';
+  };
+  const id   = get('id');
+  const name = get('name');
+  if (!id || !name) { toast('ID and Official Name are required before staging.', 'inf'); return; }
+
+  const sources = get('src').split('\n').map(s=>s.trim()).filter(Boolean);
+
+  const record = {
+    id,
+    official_name:             name,
+    official_name_hi:          get('namehi') || null,
+    entity_type:               get('type')   || 'Institution',
+    category:                  get('cat')    || 'Other',
+    official_website:          get('web')    || null,
+    official_x_handle:         get('x')      || null,
+    official_instagram_handle: get('ig')     || null,
+    verified_status:           'Pending',
+    confidence_score:          0,
+    source_urls:               sources,
+    discovered_sources:        [sourceTag],
+  };
+
+  spin(true);
+  try {
+    await axios.post(`${API_BASE}/api/identities`, record);
+    document.getElementById(`${prefix}-preview`).classList.remove('active');
+    toast(`✅ '${name}' staged for review.`, 'ok');
+  } catch (err) {
+    const msg = err.response?.data?.detail || 'Stage failed.';
+    toast(`❌ ${msg}`, 'err');
+  } finally {
+    spin(false);
+  }
+}
+
+// ── ADMIN PORTAL ──────────────────────────────────────────────────────────────
+async function loadAdmin() {
+  if (!_token) { renderAdminGuard(); return; }
+  spin(true);
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/identities`);
+    _allRecords = data;
+    updateStats(data);
+    renderGrid(data, _activeFilter);
+  } catch (err) {
+    if (err.response?.status !== 401) {
+      document.getElementById('id-grid').innerHTML =
+        `<div class="empty" style="grid-column:1/-1"><div class="empty-icon">⚠️</div><p>Could not load records. Is the API at <code>${API_BASE}</code> running?</p></div>`;
+    }
+  } finally {
+    spin(false);
+  }
+}
+
+function updateStats(records) {
+  document.getElementById('s-total').textContent    = records.length;
+  document.getElementById('s-verified').textContent = records.filter(r=>r.verified_status==='Verified').length;
+  document.getElementById('s-pending').textContent  = records.filter(r=>r.verified_status==='Pending').length;
+  document.getElementById('s-rejected').textContent = records.filter(r=>r.verified_status==='Rejected').length;
+}
+
+function setFilter(filter, btn) {
+  _activeFilter = filter;
+  document.querySelectorAll('.filter').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  renderGrid(_allRecords, filter);
+}
+
+function renderGrid(records, filter) {
+  const grid = document.getElementById('id-grid');
+  const list = filter === 'all' ? records : records.filter(r => r.verified_status === filter);
+
+  if (!list.length) {
+    grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="empty-icon">📭</div><p>No records match this filter.</p></div>`;
+    return;
+  }
+  grid.innerHTML = list.map(buildCard).join('');
+}
+
+function buildCard(r) {
+  const bMap = { Verified:'badge-verified', Pending:'badge-pending', Rejected:'badge-rejected' };
+  const bCls = bMap[r.verified_status] || 'badge-pending';
+  const srcs = (r.discovered_sources || []).map(s => `<span class="src-tag">${esc(s)}</span>`).join('');
+  const src_count = (r.source_urls || []).length;
+
+  const handles = [
+    r.official_x_handle        ? `<div class="id-handle-row"><span class="id-handle-lbl">𝕏</span>@${esc(r.official_x_handle)}</div>` : '',
+    r.official_instagram_handle ? `<div class="id-handle-row"><span class="id-handle-lbl">IG</span>@${esc(r.official_instagram_handle)}</div>` : '',
+    r.official_website          ? `<div class="id-handle-row"><span class="id-handle-lbl">🌐</span><a href="${esc(r.official_website)}" target="_blank" rel="noopener">${esc(r.official_website)}</a></div>` : '',
+  ].filter(Boolean).join('');
+
+  const approveBtn = `<button class="btn btn-success btn-sm" onclick="verifyRecord('${esc(r.id)}','Verified')">✅ Approve</button>`;
+  const rejectBtn  = `<button class="btn btn-danger  btn-sm" onclick="verifyRecord('${esc(r.id)}','Rejected')">✖ Reject</button>`;
+  const revokeBtn  = `<button class="btn btn-danger  btn-sm" onclick="verifyRecord('${esc(r.id)}','Rejected')">✖ Revoke</button>`;
+  const deleteBtn  = `<button class="btn btn-ghost   btn-sm" onclick="deleteRecord('${esc(r.id)}')">🗑</button>`;
+  const scanBtn    = `<button class="btn btn-ghost   btn-sm" onclick="scanFromAdmin('${esc(r.official_x_handle||r.official_name)}')">🔍</button>`;
+
+  let actions = '';
+  if      (r.verified_status === 'Pending')  actions = `${approveBtn}${rejectBtn}${deleteBtn}`;
+  else if (r.verified_status === 'Verified') actions = `${revokeBtn}${scanBtn}${deleteBtn}`;
+  else                                        actions = `${approveBtn}${deleteBtn}`;
+
+  return `
+    <div class="id-card" id="card-${esc(r.id)}">
+      <div class="id-card-head">
+        <div>
+          <div class="id-name">${esc(r.official_name)}</div>
+          ${r.official_name_hi ? `<div class="id-name-hi">${esc(r.official_name_hi)}</div>` : ''}
+        </div>
+        <span class="badge ${bCls}">${r.verified_status}</span>
+      </div>
+      <div class="id-tags">
+        <span class="tag">${esc(r.entity_type)}</span>
+        <span class="tag">${esc(r.category)}</span>
+        <span class="tag">📎 ${src_count} src</span>
+      </div>
+      ${handles ? `<div class="id-handles">${handles}</div>` : ''}
+      <div class="conf-wrap">
+        <div class="conf-hd"><span>Trust Score</span><span style="color:var(--accent);font-family:var(--mono)">${r.confidence_score}%</span></div>
+        <div class="conf-bar"><div class="conf-fill" style="width:${r.confidence_score}%"></div></div>
+      </div>
+      ${srcs ? `<div class="src-tags">${srcs}</div>` : ''}
+      <div class="id-actions">${actions}</div>
+    </div>`;
+}
+
+async function verifyRecord(id, action) {
+  if (!confirm(`${action === 'Verified' ? 'Approve' : 'Reject'} "${id}"?`)) return;
+  spin(true);
+  try {
+    await axios.put(`${API_BASE}/api/identities/${id}/verify`, { action });
+    toast(`${id} → ${action}`, action === 'Verified' ? 'ok' : 'inf');
+    await loadAdmin();
+  } catch (err) {
+    toast(err.response?.data?.detail || 'Update failed.', 'err');
+  } finally {
+    spin(false);
+  }
+}
+
+async function deleteRecord(id) {
+  if (!confirm(`Permanently delete "${id}"? This cannot be undone.`)) return;
+  spin(true);
+  try {
+    await axios.delete(`${API_BASE}/api/identities/${id}`);
+    toast(`Deleted: ${id}`, 'inf');
+    await loadAdmin();
+  } catch (err) {
+    toast(err.response?.data?.detail || 'Delete failed.', 'err');
+  } finally {
+    spin(false);
+  }
+}
+
+function scanFromAdmin(handle) {
+  if (!handle) return;
+  document.querySelector('[data-tab="scanner"]').click();
+  document.getElementById('scan-input').value = handle;
+  runScan();
+}
+
+// ── UTILITIES ─────────────────────────────────────────────────────────────────
+function spin(on) {
+  document.getElementById('spinner').classList.toggle('on', on);
+}
+
+function esc(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function toast(msg, type = 'inf') {
+  const root = document.getElementById('toast-root');
+  const el   = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  root.appendChild(el);
+  setTimeout(() => el.remove(), 4500);
+}
+</script>
+</body>
+</html>
