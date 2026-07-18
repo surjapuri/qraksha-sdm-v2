@@ -2,6 +2,7 @@ fastapi
 uvicorn
 pydantic
 requests
+httpx
 passlib[bcrypt]
 python-jose[cryptography]
 python-dotenv
