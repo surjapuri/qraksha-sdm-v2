@@ -1,0 +1,19 @@
+# QRaksha SDM v2.2 — Termux Android Compatible Requirements
+# pydantic==1.10.13 = pure Python, zero Rust dependency
+# Tested on: Termux aarch64, Python 3.11 / 3.12 / 3.13
+
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+pydantic==1.10.13
+requests==2.32.3
+httpx==0.28.1
+python-multipart==0.0.18
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+python-dotenv==1.0.1
+
+# pandas and openpyxl: install SEPARATELY after the above
+# They have pre-built aarch64 wheels but may take time to download
+# Run after main install:
+#   pip install pandas==2.2.3 openpyxl==3.1.5
