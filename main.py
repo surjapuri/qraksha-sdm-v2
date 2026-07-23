@@ -79,13 +79,12 @@ JWT_SECRET_KEY      = os.environ.get("JWT_SECRET_KEY", "qraksha_secret_change_me
 JWT_ALGORITHM       = "HS256"
 JWT_EXPIRE_HOURS    = 12
 
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
-ANTHROPIC_MODEL   = "claude-sonnet-4-6"
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
+SERPAPI_KEY    = os.environ.get("SERPAPI_KEY",    "").strip()
 
 print(f"[Boot] Storage  : {'GitHub' if USE_GITHUB else 'Local file'}")
 print(f"[Boot] Auth     : {'bcrypt hash' if ADMIN_PASSWORD_HASH else 'DEV FALLBACK (password=admin)'}")
-print(f"[Boot] AI parser: {'Anthropic' if ANTHROPIC_API_KEY else 'Regex fallback'}")
+print(f"[Boot] AI parser: {'Gemini' if GEMINI_API_KEY else 'Regex fallback'}")
 print(f"[Boot] Pandas   : {'yes' if PANDAS_AVAILABLE else 'no'}")
 print(f"[Boot] Hash len : {len(ADMIN_PASSWORD_HASH)}")
 
@@ -569,6 +568,93 @@ async def parse_unstructured(body: UnstructuredParseRequest):
         raise HTTPException(status_code=400,detail="Text too short.")
     return await parse_with_ai(body.text.strip(), body.hint)
 
+
+
+
+@app.post("/api/osint/smart-extract")
+async def smart_osint_extract(entity_name: str):
+    """OSINT: SerpAPI + Gemini AI se entity data extract karo"""
+    if not SERPAPI_KEY:
+        raise HTTPException(status_code=503, detail="SERPAPI_KEY not configured.")
+    if not GEMINI_API_KEY:
+        raise HTTPException(status_code=503, detail="GEMINI_API_KEY not configured.")
+
+    # Step 1: SerpAPI Google Search
+    try:
+        serp = requests.get(
+            "https://serpapi.com/search.json",
+            params={"q": f"{entity_name} official instagram twitter website India",
+                    "api_key": SERPAPI_KEY, "num": 10},
+            timeout=15,
+        )
+        serp.raise_for_status()
+        results = serp.json().get("organic_results", [])
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"SerpAPI error: {e}")
+
+    snippets = [{"title": r.get("title"), "link": r.get("link"),
+                 "snippet": r.get("snippet")} for r in results[:8]]
+
+    # Step 2: Gemini AI Extraction
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=GEMINI_API_KEY)
+        model = genai.GenerativeModel("gemini-2.0-flash")
+        prompt = f"""You are an OSINT analyst for QRaksha DB.
+Analyze these search results for "{entity_name}" (Indian public figure).
+Extract ONLY official verified accounts. Ignore fan pages and news articles.
+Return ONLY valid JSON (no markdown):
+{{
+  "id": "lowercase-hyphen-slug",
+  "official_name": "{entity_name}",
+  "official_name_hi": "hindi name in devanagari",
+  "entity_type": "Individual or Institution",
+  "category": "Government/Celebrity/Brand/Media/Finance/Education/NGO/Other",
+  "official_website": "url or null",
+  "official_x_handle": "handle without @ or null",
+  "official_instagram_handle": "handle without @ or null",
+  "source_urls": ["official URLs found"]
+}}
+
+SEARCH DATA:
+{json.dumps(snippets, ensure_ascii=False)}"""
+
+        resp = model.generate_content(prompt)
+        raw = re.sub(r"```(?:json)?", "", resp.text).strip().strip("`")
+        extracted = json.loads(raw)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gemini error: {e}")
+
+    # Step 3: Normalize and save
+    etype = extracted.get("entity_type", "Individual")
+    record = {
+        "id": extracted.get("id", re.sub(r"[^a-z0-9\-]", "",
+               entity_name.lower().replace(" ", "-"))[:48]),
+        "official_name":             extracted.get("official_name", entity_name),
+        "official_name_hi":          extracted.get("official_name_hi"),
+        "entity_type":               etype if etype in ("Individual","Institution") else "Individual",
+        "category":                  extracted.get("category", "Other"),
+        "official_website":          extracted.get("official_website"),
+        "official_x_handle":         extracted.get("official_x_handle"),
+        "official_instagram_handle": extracted.get("official_instagram_handle"),
+        "verified_status":           "Pending",
+        "confidence_score":          0,
+        "source_urls":               extracted.get("source_urls", []),
+        "discovered_sources":        ["Google_SerpAPI", "Gemini_AI"],
+        "added_at":                  datetime.now(timezone.utc).isoformat(),
+    }
+
+    records = load_database()
+    idx = next((i for i,r in enumerate(records) if r["id"]==record["id"]), None)
+    if idx is not None:
+        records[idx] = record; action = "updated"
+    else:
+        records.append(record); action = "added"
+    save_database(records, commit_msg=f"OSINT: {entity_name}")
+
+    return {"status": "success", "action": action,
+            "message": f"'{entity_name}' DB mein {action} kar diya.",
+            "data": record}
 
 @app.get("/api/check")
 def check_identity(query: str=Query(..., min_length=1)):
