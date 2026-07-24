@@ -4,7 +4,61 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>QRaksha SDM v2 — Identity Intelligence Platform</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.7.7/axios.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.7.7/axios.min.js">
+  // ── AUTOCOMPLETE ──────────────────────────────────────────────
+  let _sugT = null, _sugIdx = -1;
+  const _sInput = document.getElementById('scan-input');
+  const _sList  = document.getElementById('suggest-list');
+
+  function _closeSug() { _sList.classList.remove('open'); _sugIdx=-1; }
+
+  function _openSug(items) {
+    if (!items||!items.length) { _closeSug(); return; }
+    _sList.innerHTML = items.map((it,i) =>
+      '<div class="suggest-item" onclick="pickSug(\'' + (it.x||it.label).replace(/'/g,"\\'") + '\')">' +
+      '<div><div class="sug-name">' + esc(it.label) + (it.label_hi?' <span style="font-weight:400;color:var(--text-2)">'+esc(it.label_hi)+'</span>':'') + '</div>' +
+      '<div class="sug-sub">' + (it.x?'@'+esc(it.x)+' · ':'') + esc(it.category||'') + ' · ' + esc(it.match||'') + '</div></div>' +
+      '<span class="sug-badge ' + (it.verified?'sug-v':'sug-p') + '">' + (it.verified?'✅ Verified':'⏳ Pending') + '</span></div>'
+    ).join('');
+    _sList.classList.add('open');
+  }
+
+  function pickSug(val) { _sInput.value=val; _closeSug(); runScan(); }
+
+  _sInput.addEventListener('input', e => {
+    const q = e.target.value.trim();
+    clearTimeout(_sugT);
+    if (q.length<2) { _closeSug(); return; }
+    _sugT = setTimeout(async () => {
+      try {
+        const {data} = await axios.get(`${API_BASE}/api/suggest`, {params:{q}});
+        _openSug(data);
+      } catch { _closeSug(); }
+    }, 300);
+  });
+
+  _sInput.addEventListener('keydown', e => {
+    const its = _sList.querySelectorAll('.suggest-item');
+    if (!_sList.classList.contains('open')||!its.length) return;
+    if (e.key==='ArrowDown'){e.preventDefault();_sugIdx=Math.min(_sugIdx+1,its.length-1);}
+    else if (e.key==='ArrowUp'){e.preventDefault();_sugIdx=Math.max(_sugIdx-1,0);}
+    else if (e.key==='Escape'){_closeSug();return;}
+    else return;
+    its.forEach((el,i)=>el.classList.toggle('active',i===_sugIdx));
+    if(_sugIdx>=0) _sInput.value=its[_sugIdx].textContent.trim().split('\n')[0].trim();
+  });
+
+  document.addEventListener('click', e => { if(!e.target.closest('.suggest-wrap')) _closeSug(); });
+
+  // ── AUTO LOG SCANS ─────────────────────────────────────────────
+  const _origRR = renderRisk;
+  function renderRisk(d, query) {
+    _origRR(d, query);
+    axios.post(`${API_BASE}/api/search-log`, null,
+      {params:{query,risk_level:d.risk_level}}).catch(()=>{});
+  }
+
+</script>
   <style>
     /* ═══ DESIGN TOKENS ════════════════════════════════════════════════════ */
     :root {
@@ -404,6 +458,19 @@
       font-family:var(--mono);font-size:.78rem;
       background:var(--surface-3);padding:2px 6px;border-radius:4px;color:var(--accent);
     }
+  
+    .suggest-wrap{position:relative;flex:1}
+    .suggest-list{position:absolute;top:100%;left:0;right:0;z-index:300;background:var(--surface-2);border:1px solid var(--border-2);border-top:none;border-radius:0 0 var(--r) var(--r);max-height:240px;overflow-y:auto;display:none;box-shadow:var(--shadow)}
+    .suggest-list.open{display:block}
+    .suggest-item{padding:.55rem 1rem;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid var(--border);transition:background .15s;font-size:.84rem}
+    .suggest-item:hover,.suggest-item.active{background:var(--accent-glow)}
+    .suggest-item:last-child{border-bottom:none}
+    .sug-name{font-weight:700}
+    .sug-sub{font-size:.7rem;color:var(--text-2);font-family:var(--mono)}
+    .sug-badge{font-size:.6rem;padding:2px 6px;border-radius:8px;flex-shrink:0;border:1px solid;white-space:nowrap}
+    .sug-v{background:var(--safe-bg);color:var(--safe);border-color:rgba(16,185,129,.3)}
+    .sug-p{background:var(--purple-bg);color:var(--purple);border-color:rgba(139,92,246,.3)}
+
   </style>
 </head>
 <body>

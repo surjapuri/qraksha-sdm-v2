@@ -421,7 +421,7 @@ def _regex_fallback(text: str) -> dict:
 
 
 async def parse_with_ai(text: str, hint: Optional[str]) -> dict:
-    if not ANTHROPIC_API_KEY: return _regex_fallback(text)
+    if not GEMINI_API_KEY: return _regex_fallback(text)
     sys_p=("Extract identity from text into JSON: id,official_name,official_name_hi,"
            "entity_type,category,official_website,official_x_handle,"
            "official_instagram_handle,source_urls. Raw JSON only.")
@@ -429,7 +429,7 @@ async def parse_with_ai(text: str, hint: Optional[str]) -> dict:
     try:
         async with httpx.AsyncClient(timeout=40) as c:
             r=await c.post(ANTHROPIC_API_URL,
-                headers={"x-api-key":ANTHROPIC_API_KEY,"anthropic-version":"2023-06-01",
+                headers={"x-api-key":GEMINI_API_KEY,"anthropic-version":"2023-06-01",
                          "content-type":"application/json"},
                 json={"model":ANTHROPIC_MODEL,"max_tokens":900,"system":sys_p,
                       "messages":[{"role":"user","content":msg}]})
@@ -454,7 +454,7 @@ async def parse_with_ai(text: str, hint: Optional[str]) -> dict:
 def root():
     return {"platform":"QRaksha/SDM v2.3","status":"operational",
             "storage":"github" if USE_GITHUB else "local",
-            "ai_parser":"anthropic" if ANTHROPIC_API_KEY else "regex_fallback",
+            "ai_parser":"anthropic" if GEMINI_API_KEY else "regex_fallback",
             "pandas":PANDAS_AVAILABLE,"docs":"/docs"}
 
 
@@ -599,7 +599,7 @@ async def smart_osint_extract(entity_name: str):
     try:
         import google.generativeai as genai
         genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel("gemini-2.0-flash")
+        model = genai.GenerativeModel("gemini-1.5-flash")
         prompt = f"""You are an OSINT analyst for QRaksha DB.
 Analyze these search results for "{entity_name}" (Indian public figure).
 Extract ONLY official verified accounts. Ignore fan pages and news articles.
@@ -623,7 +623,13 @@ SEARCH DATA:
         raw = re.sub(r"```(?:json)?", "", resp.text).strip().strip("`")
         extracted = json.loads(raw)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Gemini error: {e}")
+        print(f"[Gemini] {e} — trying Wikidata fallback")
+        try:
+            wd = fetch_wikidata_entity(entity_name)
+            if not wd.get("found"): raise Exception("Wikidata miss")
+            extracted = wd
+        except Exception as we:
+            raise HTTPException(status_code=500, detail=f"Gemini:{e}|Wikidata:{we}")
 
     # Step 3: Normalize and save
     etype = extracted.get("entity_type", "Individual")
@@ -655,6 +661,55 @@ SEARCH DATA:
     return {"status": "success", "action": action,
             "message": f"'{entity_name}' DB mein {action} kar diya.",
             "data": record}
+
+
+
+@app.get("/api/suggest")
+def suggest_identities(q: str = Query("", min_length=1)):
+    if len(q.strip()) < 2: return []
+    records = load_database()
+    q_low = q.strip().lower()
+    seen, out = set(), []
+    for r in records:
+        if r.get("id","").startswith("__"): continue
+        for field, label in [
+            (r.get("official_name",""),"name"),
+            (r.get("official_x_handle",""),"X"),
+            (r.get("official_instagram_handle",""),"Instagram"),
+            (r.get("official_name_hi",""),"Hindi"),
+        ]:
+            if field and q_low in field.lower() and r["id"] not in seen:
+                seen.add(r["id"])
+                out.append({"id":r.get("id"),"label":r.get("official_name"),
+                    "label_hi":r.get("official_name_hi"),"x":r.get("official_x_handle"),
+                    "ig":r.get("official_instagram_handle"),"website":r.get("official_website"),
+                    "category":r.get("category"),"verified":r.get("verified_status")=="Verified",
+                    "match":label})
+                break
+        if len(out)>=8: break
+    return out
+
+
+@app.post("/api/search-log")
+def log_search(query: str, risk_level: str = "UNVERIFIED"):
+    try:
+        records = load_database()
+        LID = "__search_log__"
+        log = next((r for r in records if r.get("id")==LID), None)
+        if not log:
+            log={"id":LID,"official_name":"_Search Log","entity_type":"Institution",
+                 "category":"Other","verified_status":"Verified","confidence_score":0,
+                 "source_urls":[],"discovered_sources":["System"],"searches":[]}
+            records.append(log)
+        idx = next(i for i,r in enumerate(records) if r.get("id")==LID)
+        log.setdefault("searches",[])
+        log["searches"].append({"q":query,"risk":risk_level,"at":datetime.now(timezone.utc).isoformat()})
+        log["searches"] = log["searches"][-500:]
+        records[idx] = log
+        save_database(records, commit_msg=f"Log:{query[:15]}")
+        return {"logged":True}
+    except Exception as e:
+        return {"logged":False,"error":str(e)}
 
 @app.get("/api/check")
 def check_identity(query: str=Query(..., min_length=1)):
